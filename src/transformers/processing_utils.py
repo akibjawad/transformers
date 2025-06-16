@@ -74,6 +74,7 @@ if is_torch_available():
 
 
 logger = logging.get_logger(__name__)
+logger.setLevel(logging.INFO)
 
 # Dynamically import the Transformers module to grab the attribute classes of the processor from their names.
 transformers_module = direct_transformers_import(Path(__file__).parent)
@@ -1471,6 +1472,7 @@ class ProcessorMixin(PushToHubMixin):
         chat_template: Optional[str] = None,
         **kwargs: Unpack[AllKwargsForChatTemplate],
     ) -> str:
+        logger.info(f'calling apply_chat_template file {__file__} line {1389} with chat_template={chat_template}')
         """
         Similar to the `apply_chat_template` method on tokenizers, this method applies a Jinja template to input
         conversations to turn them into a single tokenizable string.
