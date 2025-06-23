@@ -35,7 +35,7 @@ from .dynamic_module_utils import custom_object_save
 from .feature_extraction_utils import BatchFeature
 from .image_utils import ChannelDimension, is_valid_image, is_vision_available, load_image
 from .utils.chat_template_utils import render_jinja_template
-from .video_utils import VideoMetadata, load_video
+from .video_utils import VideoMetadata, load_video, process_video_object
 
 
 if is_vision_available():
@@ -68,6 +68,7 @@ from .utils.deprecation import deprecate_kwarg
 
 
 logger = logging.get_logger(__name__)
+logger.setLevel(logging.INFO)
 
 # Dynamically import the Transformers module to grab the attribute classes of the processor from their names.
 transformers_module = direct_transformers_import(Path(__file__).parent)
@@ -1386,6 +1387,7 @@ class ProcessorMixin(PushToHubMixin):
         chat_template: Optional[str] = None,
         **kwargs: Unpack[AllKwargsForChatTemplate],
     ) -> str:
+        logger.info(f'calling apply_chat_template file {__file__} line {1389} with chat_template={chat_template}')
         """
         Similar to the `apply_chat_template` method on tokenizers, this method applies a Jinja template to input
         conversations to turn them into a single tokenizable string.
@@ -1512,20 +1514,39 @@ class ProcessorMixin(PushToHubMixin):
                             batch_audios.append(load_audio(fname, sampling_rate=mm_load_kwargs["sampling_rate"]))
 
                     for fname in video_fnames:
+                        # Case 1: List of image file paths
                         if isinstance(fname, (list, tuple)) and isinstance(fname[0], str):
                             video = [np.array(load_image(image_fname)) for image_fname in fname]
-                            # create a 4D video because `load_video` always returns a 4D array
                             video = np.stack(video)
                             metadata = None
                             logger.warning(
                                 "When loading the video from list of images, we cannot infer metadata such as `fps` or `duration`. "
                                 "If your model requires metadata during processing, please load the whole video and let the processor sample frames instead."
                             )
-                        else:
+
+                        # Case 2: Video file path or URL
+                        elif isinstance(fname, str):
                             video, metadata = load_video(
                                 fname,
                                 backend=mm_load_kwargs["video_load_backend"],
                             )
+                        else:
+                            # video is an object, not a file path or URL, it is a VideoInput type
+                            # incase of video object, we expect user to pass fps in
+                            metadata = mm_load_kwargs.get("video_metadata", None)
+                            if metadata is None:
+                                raise ValueError(
+                                    "When passing a video object, you must provide `video_metadata` with at least `fps`."
+                                )
+                            video, metadata = process_video_object(
+                                video_obj=fname,
+                                video_fps=mm_load_kwargs["video_fps"],
+                                sampling_fps=mm_load_kwargs["sampling_fps"],
+                                video_load_backend=mm_load_kwargs["video_load_backend"],
+                                sample_indices_fn=mm_load_kwargs["sample_indices_fn"],
+                                kwargs=mm_load_kwargs.get("video_load_kwargs", {}),
+                            )
+                        
                         videos.append(video)
                         video_metadata.append(metadata)
 
