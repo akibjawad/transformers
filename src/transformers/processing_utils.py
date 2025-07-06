@@ -1111,6 +1111,7 @@ class ProcessorMixin(PushToHubMixin):
         # instantiate processor with used (and valid) kwargs only
         processor = cls(*args, **valid_kwargs)
 
+        logger.info(f"Processor {processor}")
         if return_unused_kwargs:
             return processor, unused_kwargs
         else:
@@ -1311,7 +1312,6 @@ class ProcessorMixin(PushToHubMixin):
 
     @classmethod
     def register_for_auto_class(cls, auto_class="AutoProcessor"):
-        logger.info(f"Processor {processor}")
         """
         Register this class with a given auto class. This should only be used for custom feature extractors as the ones
         in the library are already mapped with `AutoProcessor`.
